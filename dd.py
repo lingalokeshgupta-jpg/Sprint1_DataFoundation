@@ -23,3 +23,13 @@ print(icr_warning(1.2))
 print(net_debt(500,100))
 
 print(asset_turnover(1000,5000))
+
+
+from src.analytics.cagr import *
+
+print(revenue_cagr(100,200,5))
+print(revenue_cagr(100,-50,5))
+print(revenue_cagr(-50,100,5))
+print(revenue_cagr(-50,-20,5))
+print(revenue_cagr(0,200,5))
+print(revenue_cagr(None,200,5))
