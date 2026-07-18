@@ -46,3 +46,21 @@ SELECT
     close_price
 FROM stock_prices
 WHERE close_price <= 0;
+
+SELECT company_id, market_cap_crore
+FROM market_cap
+ORDER BY market_cap_crore DESC
+LIMIT 10;
+
+
+-- Companies by sub-sector
+SELECT sub_sector, COUNT(*) AS company_count
+FROM sectors
+GROUP BY sub_sector
+ORDER BY company_count DESC;
+
+-- Top 10 companies by latest sales
+SELECT company_id, year, sales
+FROM profitandloss
+ORDER BY sales DESC
+LIMIT 10;
