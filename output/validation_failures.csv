@@ -1,0 +1,11 @@
+DQ_Rule,Severity,Table,Message
+DQ-03,CRITICAL,companies,9 missing values found
+DQ-07,WARNING,profitandloss,269 invalid OPM values.
+DQ-09,WARNING,cashflow,2 missing cash flow values.
+DQ-14,WARNING,documents,52 missing annual reports.
+DQ-15,WARNING,prosandcons,6 missing pros/cons.
+DQ-02,CRITICAL,profitandloss,99 invalid foreign keys in 'company_id'
+DQ-02,CRITICAL,balancesheet,85 invalid foreign keys in 'company_id'
+DQ-02,CRITICAL,cashflow,96 invalid foreign keys in 'company_id'
+DQ-02,CRITICAL,analysis,4 invalid foreign keys in 'company_id'
+DQ-02,CRITICAL,financial_ratios,24 invalid foreign keys in 'company_id'
