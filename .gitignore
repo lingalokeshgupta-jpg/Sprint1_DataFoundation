@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Virtual Environment
+venv/
+
+# SQLite Database
+db/*.db
+
+# Output Files
+output/*.csv
+
+# VS Code
+.vscode/
