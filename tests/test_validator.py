@@ -1,13 +1,7 @@
-import sys
-from pathlib import Path
-
-# Make src/etl importable as top-level modules
-
-
 import pandas as pd
 import pytest
 
-from validator import (
+from validator  import (
     validation_errors,
     dq01_pk_uniqueness,
     dq02_fk_integrity,
