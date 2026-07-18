@@ -12,7 +12,6 @@ def normalize_year(value):
     except Exception:
         return None
     
-normalize_year("2024")
 
 def normalize_ticker(value):
     """
@@ -24,7 +23,6 @@ def normalize_ticker(value):
 
     return str(value).strip().upper()
 
-normalize_ticker(" tcs ")
 
 def normalize_text(value):
 
