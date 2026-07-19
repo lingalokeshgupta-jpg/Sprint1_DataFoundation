@@ -335,3 +335,42 @@ SELECT * FROM financial_ratios LIMIT 1;
 SELECT name
 FROM sqlite_master
 WHERE type='table';
+
+
+ALTER TABLE financial_ratios
+ADD COLUMN composite_quality_score REAL;
+
+
+PRAGMA table_info(financial_ratios);
+
+SELECT COUNT(*) FROM financial_ratios;
+
+
+SELECT
+COUNT(net_profit_margin_pct),
+COUNT(operating_profit_margin_pct),
+COUNT(return_on_equity_pct),
+COUNT(debt_to_equity),
+COUNT(interest_coverage),
+COUNT(asset_turnover),
+COUNT(free_cash_flow_cr),
+COUNT(capex_cr),
+COUNT(earnings_per_share),
+COUNT(book_value_per_share),
+COUNT(dividend_payout_ratio_pct),
+COUNT(total_debt_cr),
+COUNT(cash_from_operations_cr),
+COUNT(composite_quality_score)
+FROM financial_ratios;
+
+SELECT company_id,
+year,
+return_on_equity_pct,
+debt_to_equity
+FROM financial_ratios
+WHERE return_on_equity_pct > 15
+AND debt_to_equity < 1;
+
+SELECT *
+FROM financial_ratios
+WHERE company_id='TCS';
