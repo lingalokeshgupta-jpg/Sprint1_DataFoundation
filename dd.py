@@ -33,3 +33,25 @@ print(revenue_cagr(-50,100,5))
 print(revenue_cagr(-50,-20,5))
 print(revenue_cagr(0,200,5))
 print(revenue_cagr(None,200,5))
+
+
+
+from src.analytics.cashflow_kpis import *
+
+print(free_cash_flow(500, -200))
+
+print(cfo_quality_score(
+    [100,120,140],
+    [80,100,120]
+))
+
+print(capex_intensity(-50,1000))
+
+print(fcf_conversion_rate(300,500))
+
+print(capital_allocation_pattern(
+    100,
+    -50,
+    -20,
+    1.2
+))
