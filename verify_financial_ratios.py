@@ -11,3 +11,4 @@ rows = cursor.fetchone()[0]
 print("Total Rows:", rows)
 
 conn.close()
+

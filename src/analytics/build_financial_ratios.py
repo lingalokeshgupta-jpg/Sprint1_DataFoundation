@@ -1,7 +1,9 @@
+import os
 import sqlite3
 import pandas as pd
 import sys
 from pathlib import Path
+
 
 # ----------------------------------------
 # Add project paths
@@ -94,6 +96,18 @@ merged = merged.merge(
     right_on="id",
     how="left",
     suffixes=("", "_company")
+)
+
+# ----------------------------------------
+# Merge Sector Information
+# ----------------------------------------
+
+sectors = dataframes["sectors"]
+
+merged = merged.merge(
+    sectors[["company_id", "broad_sector"]],
+    on="company_id",
+    how="left"
 )
 
 print("\nFinal Merged Dataset")
@@ -265,7 +279,96 @@ def quality_score(row):
 merged["composite_quality_score"] = merged.apply(
     quality_score,
     axis=1
-)    
+)   
+
+
+# =====================================================
+# Bank / Financial Sector Carve-Out
+# =====================================================
+
+merged["high_leverage_warning"] = merged.apply(
+    lambda row: False
+    if row["broad_sector"] == "Financials"
+    else (
+        row["debt_to_equity"] is not None
+        and row["debt_to_equity"] > 5
+    ),
+    axis=1
+)
+
+# =====================================================
+# ROCE Cross Check
+# =====================================================
+
+merged["calculated_roce"] = merged.apply(
+    lambda row: roce(
+        row["operating_profit"],
+        row["equity_capital"],
+        row["reserves"],
+        row["borrowings"]
+    ),
+    axis=1
+)
+
+merged["roce_difference"] = (
+    merged["calculated_roce"]
+    - merged["roce_percentage"]
+).abs()
+
+# =====================================================
+# ROE Cross Check
+# =====================================================
+
+merged["roe_difference"] = (
+    merged["return_on_equity_pct"]
+    - merged["roe_percentage"]
+).abs()
+
+
+os.makedirs("output", exist_ok=True)
+
+with open("output/ratio_edge_cases.log", "w") as f:
+
+    f.write("Ratio Edge Cases\n")
+    f.write("=" * 60 + "\n\n")
+
+    for _, row in merged.iterrows():
+
+            if (
+                row["roce_difference"] is not None
+                and row["roce_difference"] > 5
+            ):
+
+                if row["roce_difference"] > 50:
+                    category = "Data Source Issue"
+                elif row["roce_difference"] > 15:
+                    category = "Formula Discrepancy"
+                else:
+                    category = "Version Difference"
+
+                f.write(
+                    f"{row['company_id']} | {row['year']} | "
+                    f"ROCE Difference = {row['roce_difference']:.2f} "
+                    f"| Category: {category}\n"
+                )
+            if (
+                row["roe_difference"] is not None
+                and row["roe_difference"] > 5
+            ):
+
+                if row["roe_difference"] > 50:
+                    category = "Data Source Issue"
+                elif row["roe_difference"] > 15:
+                    category = "Formula Discrepancy"
+                else:
+                    category = "Version Difference"
+
+                f.write(
+                    f"{row['company_id']} | {row['year']} | "
+                    f"ROE Difference = {row['roe_difference']:.2f} "
+                    f"| Category: {category}\n"
+                )
+print("ratio_edge_cases.log created successfully.")
 
 # =====================================================
 # Populate financial_ratios Table
