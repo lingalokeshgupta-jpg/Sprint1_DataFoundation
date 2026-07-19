@@ -326,3 +326,12 @@ CREATE TABLE IF NOT EXISTS stock_prices (
     FOREIGN KEY(company_id)
     REFERENCES companies(id)
 );
+
+PRAGMA table_info(financial_ratios);
+
+
+SELECT * FROM financial_ratios LIMIT 1;
+
+SELECT name
+FROM sqlite_master
+WHERE type='table';
