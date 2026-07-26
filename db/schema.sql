@@ -374,3 +374,14 @@ AND debt_to_equity < 1;
 SELECT *
 FROM financial_ratios
 WHERE company_id='TCS';
+
+SELECT name
+FROM sqlite_master
+WHERE type='table';
+
+select * from companies;
+
+
+SELECT id, company_name
+FROM companies
+LIMIT 10;
