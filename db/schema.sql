@@ -385,3 +385,9 @@ select * from companies;
 SELECT id, company_name
 FROM companies
 LIMIT 10;
+
+PRAGMA table_info(profitandloss);
+
+PRAGMA table_info(balancesheet);
+
+PRAGMA table_info(cashflow);
