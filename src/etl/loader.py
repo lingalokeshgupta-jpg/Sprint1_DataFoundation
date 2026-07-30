@@ -44,7 +44,13 @@ def load_all_files():
     dataframes = {}
 
     for key, file in FILES.items():
+
         df = load_excel(file, SKIP_ROWS[key])
+
+        if key == "cashflow":
+            print("\n========== CASHFLOW CHECK ==========")
+            print(df[df["company_id"].astype(str).str.contains("ATGL", na=False)])
+            print("ATGL rows:", len(df[df["company_id"].astype(str).str.contains("ATGL", na=False)]))
         dataframes[key] = df
         print(f"{key}: {len(df)} rows loaded")
 

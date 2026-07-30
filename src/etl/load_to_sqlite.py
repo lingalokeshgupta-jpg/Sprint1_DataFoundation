@@ -39,7 +39,18 @@ def load_database():
         print(f"Loading {table}...")
 
         df = dataframes[table]
+        df = dataframes[table]
 
+        if table == "cashflow":
+            print("\nChecking ATGL in cashflow dataframe...")
+            print(df[df["company_id"] == "ATGL"])
+            print("ATGL rows:", len(df[df["company_id"] == "ATGL"]))
+        df.to_sql(
+            table,
+            conn,
+            if_exists="replace",
+            index=False
+)
         # Replace table contents
         df.to_sql(
             table,

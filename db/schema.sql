@@ -386,8 +386,31 @@ SELECT id, company_name
 FROM companies
 LIMIT 10;
 
-PRAGMA table_info(profitandloss);
+PRAGMA table_info(financial_ratios);
+
+PRAGMA table_info(market_cap);
 
 PRAGMA table_info(balancesheet);
 
 PRAGMA table_info(cashflow);
+
+PRAGMA table_info(financials);
+
+PRAGMA table_info(profitandloss);
+
+
+SELECT *
+FROM profitandloss
+WHERE company_id = 'ATGL';
+
+SELECT *
+FROM cashflow
+WHERE company_id = 'ATGL';
+
+SELECT *
+FROM balancesheet
+WHERE company_id = 'ATGL';
+
+SELECT *
+FROM cashflow
+WHERE company_id = 'ATGL';
