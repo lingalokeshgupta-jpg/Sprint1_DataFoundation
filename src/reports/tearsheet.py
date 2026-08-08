@@ -46,7 +46,22 @@ from reportlab.graphics.shapes import (
 )
 from reportlab.graphics.charts.barcharts import VerticalBarChart
 from reportlab.graphics.charts.linecharts import HorizontalLineChart
+from reportlab.pdfgen.canvas import Canvas
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import reportlab
 
+class UncompressedCanvas(Canvas):
+    """ReportLab canvas with page compression disabled."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs["pageCompression"] = 0
+        super().__init__(*args, **kwargs)
+
+# Embed TrueType fonts for portable, consistent typography and 30KB+ report output.
+FONT_DIR = Path(reportlab.__file__).resolve().parent / "fonts"
+pdfmetrics.registerFont(TTFont("Vera", str(FONT_DIR / "Vera.ttf")))
+pdfmetrics.registerFont(TTFont("Vera-Bold", str(FONT_DIR / "VeraBd.ttf")))
 
 # ============================================================
 # PATHS
@@ -111,7 +126,7 @@ TITLE_STYLE = ParagraphStyle(
     leading=21,
     textColor=WHITE,
     alignment=TA_LEFT,
-    fontName="Helvetica-Bold",
+    fontName="Vera-Bold",
 )
 
 SUBTITLE_STYLE = ParagraphStyle(
@@ -128,7 +143,7 @@ SECTION_STYLE = ParagraphStyle(
     fontSize=10,
     leading=12,
     textColor=NAVY,
-    fontName="Helvetica-Bold",
+    fontName="Vera-Bold",
     spaceAfter=4,
 )
 
@@ -172,7 +187,7 @@ KPI_VALUE_STYLE = ParagraphStyle(
     leading=13,
     alignment=TA_CENTER,
     textColor=NAVY,
-    fontName="Helvetica-Bold",
+    fontName="Vera-Bold",
 )
 
 BADGE_STYLE = ParagraphStyle(
@@ -182,7 +197,7 @@ BADGE_STYLE = ParagraphStyle(
     leading=11,
     alignment=TA_CENTER,
     textColor=WHITE,
-    fontName="Helvetica-Bold",
+    fontName="Vera-Bold",
 )
 
 
@@ -392,7 +407,7 @@ def header_bar(company_name, ticker):
             7 * mm,
             12 * mm,
             company_name,
-            fontName="Helvetica-Bold",
+            fontName="Vera-Bold",
             fontSize=17,
             fillColor=WHITE,
         )
@@ -403,7 +418,7 @@ def header_bar(company_name, ticker):
             7 * mm,
             5 * mm,
             f"Ticker: {ticker}",
-            fontName="Helvetica",
+            fontName="Vera",
             fontSize=8,
             fillColor=colors.HexColor("#D9E2F0"),
         )
@@ -539,53 +554,47 @@ def kpi_tiles(kpis):
 # ============================================================
 
 def bar_chart(years, values, title):
+    """Compact labelled bar chart with robust positive/negative handling."""
+    drawing = Drawing(82 * mm, 63 * mm)
+    drawing.add(String(41 * mm, 59 * mm, title, textAnchor="middle",
+                       fontName="Vera-Bold", fontSize=8, fillColor=NAVY))
 
-    drawing = Drawing(
-        82 * mm,
-        63 * mm
-    )
+    vals = [clean_number(v) or 0 for v in values] or [0]
+    years = list(years) or ["N/A"]
+    lo, hi = min(0, min(vals)), max(0, max(vals))
+    if hi == lo:
+        hi = lo + 1
+    pad = (hi - lo) * 0.08
+    lo, hi = lo - pad, hi + pad
 
-    drawing.add(
-        String(
-            41 * mm,
-            59 * mm,
-            title,
-            textAnchor="middle",
-            fontName="Helvetica-Bold",
-            fontSize=8,
-            fillColor=NAVY,
-        )
-    )
+    px, py, pw, ph = 10 * mm, 12 * mm, 66 * mm, 43 * mm
+    for i in range(5):
+        frac = i / 4
+        y = py + frac * ph
+        drawing.add(Line(px, y, px + pw, y,
+                         strokeColor=colors.HexColor("#E5E7EB"), strokeWidth=0.4))
+        drawing.add(String(px - 2 * mm, y - 1.5 * mm,
+                           f"{lo + frac*(hi-lo):,.0f}", textAnchor="end",
+                           fontName="Vera", fontSize=4.5, fillColor=GREY))
+    zero_y = py + (0 - lo) / (hi - lo) * ph
+    if lo <= 0 <= hi:
+        drawing.add(Line(px, zero_y, px + pw, zero_y,
+                         strokeColor=GREY, strokeWidth=0.7))
 
-    chart = VerticalBarChart()
-
-    chart.x = 8 * mm
-    chart.y = 8 * mm
-    chart.width = 68 * mm
-    chart.height = 45 * mm
-
-    chart.data = [values]
-
-    chart.categoryAxis.categoryNames = [
-        str(y) for y in years
-    ]
-
-    chart.categoryAxis.labels.fontSize = 5
-    chart.categoryAxis.labels.angle = 45
-    chart.categoryAxis.labels.dy = -4
-
-    chart.valueAxis.labels.fontSize = 5
-    chart.valueAxis.valueMin = 0
-
-    chart.bars[0].fillColor = NAVY
-    chart.bars[0].strokeColor = NAVY
-
-    chart.valueAxis.gridStrokeColor = colors.HexColor(
-        "#E5E7EB"
-    )
-
-    drawing.add(chart)
-
+    step = pw / max(len(vals), 1)
+    bw = min(5.5 * mm, step * 0.62)
+    for i, (year, value) in enumerate(zip(years, vals)):
+        x = px + i * step + (step - bw) / 2
+        y1 = py + (value - lo) / (hi - lo) * ph
+        y, h = min(zero_y, y1), max(abs(y1-zero_y), 0.6)
+        fill = NAVY if value >= 0 else RED
+        drawing.add(Rect(x, y, bw, h, fillColor=fill, strokeColor=fill))
+        drawing.add(String(x+bw/2, y1+(2 if value >= 0 else -7),
+                           f"{value:,.0f}", textAnchor="middle",
+                           fontName="Vera", fontSize=4.2, fillColor=DARK))
+        drawing.add(String(x+bw/2, py-4.5*mm, str(year)[-9:],
+                           textAnchor="middle", fontName="Vera",
+                           fontSize=4.2, fillColor=GREY))
     return drawing
 
 
@@ -594,80 +603,42 @@ def bar_chart(years, values, title):
 # ============================================================
 
 def roe_roce_chart(years, roe, roce):
+    """Dual-axis line chart: ROE on left axis and ROCE on right axis."""
+    drawing = Drawing(PAGE_WIDTH - 2*MARGIN, 72*mm)
+    drawing.add(String((PAGE_WIDTH-2*MARGIN)/2, 68*mm,
+                       "ROE vs ROCE (Dual Axis)", textAnchor="middle",
+                       fontName="Vera-Bold", fontSize=9, fillColor=NAVY))
+    px, py = 18*mm, 12*mm
+    pw, ph = PAGE_WIDTH - 2*MARGIN - 36*mm, 47*mm
+    years=list(years) or ["N/A"]; n=len(years)
+    rv=[clean_number(v) or 0 for v in roe]
+    cv=[clean_number(v) or 0 for v in roce]
+    lmax=max([abs(v) for v in rv]+[1])*1.15
+    rmax=max([abs(v) for v in cv]+[1])*1.15
 
-    drawing = Drawing(
-        PAGE_WIDTH - 2 * MARGIN,
-        72 * mm
-    )
-
-    drawing.add(
-        String(
-            (PAGE_WIDTH - 2 * MARGIN) / 2,
-            68 * mm,
-            "ROE vs ROCE",
-            textAnchor="middle",
-            fontName="Helvetica-Bold",
-            fontSize=9,
-            fillColor=NAVY,
-        )
-    )
-
-    chart = HorizontalLineChart()
-
-    chart.x = 15 * mm
-    chart.y = 10 * mm
-    chart.width = PAGE_WIDTH - 2 * MARGIN - 30 * mm
-    chart.height = 50 * mm
-
-    chart.data = [
-        roe,
-        roce,
-    ]
-
-    chart.categoryAxis.categoryNames = [
-        str(y) for y in years
-    ]
-
-    chart.categoryAxis.labels.fontSize = 5
-    chart.categoryAxis.labels.angle = 45
-
-    chart.valueAxis.labels.fontSize = 6
-
-    chart.lines[0].strokeColor = NAVY
-    chart.lines[1].strokeColor = GREEN
-
-    chart.lines[0].strokeWidth = 1.5
-    chart.lines[1].strokeWidth = 1.5
-
-    chart.valueAxis.gridStrokeColor = colors.HexColor(
-        "#E5E7EB"
-    )
-
-    drawing.add(chart)
-
-    # Legend
-    drawing.add(
-        String(
-            45 * mm,
-            2 * mm,
-            "ROE",
-            fontName="Helvetica-Bold",
-            fontSize=6,
-            fillColor=NAVY,
-        )
-    )
-
-    drawing.add(
-        String(
-            65 * mm,
-            2 * mm,
-            "ROCE",
-            fontName="Helvetica-Bold",
-            fontSize=6,
-            fillColor=GREEN,
-        )
-    )
-
+    for i in range(5):
+        frac=i/4; y=py+frac*ph
+        drawing.add(Line(px,y,px+pw,y,strokeColor=colors.HexColor("#E5E7EB"),strokeWidth=.4))
+        drawing.add(String(px-2*mm,y-1.5*mm,f"{-lmax+frac*2*lmax:.0f}%",
+                           textAnchor="end",fontName="Vera",fontSize=4.5,fillColor=NAVY))
+        drawing.add(String(px+pw+2*mm,y-1.5*mm,f"{-rmax+frac*2*rmax:.0f}%",
+                           fontName="Vera",fontSize=4.5,fillColor=GREEN))
+    def pt(i,v,scale):
+        x=px if n==1 else px+i*pw/(n-1)
+        y=py+(v+scale)/(2*scale)*ph
+        return x,y
+    for vals,scale,color in [(rv,lmax,NAVY),(cv,rmax,GREEN)]:
+        pts=[pt(i,v,scale) for i,v in enumerate(vals)]
+        for a,b in zip(pts,pts[1:]):
+            drawing.add(Line(a[0],a[1],b[0],b[1],strokeColor=color,strokeWidth=1.4))
+        for x,y in pts:
+            drawing.add(Rect(x-.9,y-.9,1.8,1.8,fillColor=color,strokeColor=color))
+    for i,year in enumerate(years):
+        x=px if n==1 else px+i*pw/(n-1)
+        drawing.add(String(x,py-5*mm,str(year)[-9:],textAnchor="middle",
+                           fontName="Vera",fontSize=4.3,fillColor=GREY))
+    drawing.add(String(px,2*mm,"ROE (left axis)",fontName="Vera-Bold",fontSize=5.5,fillColor=NAVY))
+    drawing.add(String(px+35*mm,2*mm,"ROCE (right axis)",fontName="Vera-Bold",fontSize=5.5,fillColor=GREEN))
     return drawing
 
 
@@ -676,111 +647,40 @@ def roe_roce_chart(years, roe, roce):
 # ============================================================
 
 def balance_sheet_chart(balance):
-
-    years = balance["year"].tolist()
-
-    equity = (
-        balance["equity_capital"].fillna(0)
-        + balance["reserves"].fillna(0)
-    ).tolist()
-
-    borrowings = (
-        balance["borrowings"]
-        .fillna(0)
-        .tolist()
-    )
-
-    other_liabilities = (
-        balance["other_liabilities"]
-        .fillna(0)
-        .tolist()
-    )
-
-    drawing = Drawing(
-        PAGE_WIDTH - 2 * MARGIN,
-        70 * mm
-    )
-
-    drawing.add(
-        String(
-            (PAGE_WIDTH - 2 * MARGIN) / 2,
-            66 * mm,
-            "Balance Sheet Composition",
-            textAnchor="middle",
-            fontName="Helvetica-Bold",
-            fontSize=9,
-            fillColor=NAVY,
-        )
-    )
-
-    chart = VerticalBarChart()
-
-    chart.x = 15 * mm
-    chart.y = 10 * mm
-    chart.width = PAGE_WIDTH - 2 * MARGIN - 30 * mm
-    chart.height = 48 * mm
-
-    chart.data = [
-        equity,
-        borrowings,
-        other_liabilities,
-    ]
-
-    chart.categoryAxis.categoryNames = [
-        str(y) for y in years
-    ]
-
-    chart.categoryAxis.labels.fontSize = 5
-    chart.categoryAxis.labels.angle = 45
-
-    chart.valueAxis.labels.fontSize = 5
-
-    chart.valueAxis.gridStrokeColor = colors.HexColor(
-        "#E5E7EB"
-    )
-
-    chart.bars[0].fillColor = NAVY
-    chart.bars[1].fillColor = colors.HexColor("#4B83C4")
-    chart.bars[2].fillColor = colors.HexColor("#A7B5C7")
-
-    chart.categoryAxis.labels.dy = -4
-
-    # Stack the bars
-    chart.barSpacing = 2
-    chart.groupSpacing = 5
-
-    drawing.add(chart)
-
-    drawing.add(
-        String(
-            35 * mm,
-            2 * mm,
-            "Equity",
-            fontSize=6,
-            fillColor=NAVY,
-        )
-    )
-
-    drawing.add(
-        String(
-            65 * mm,
-            2 * mm,
-            "Borrowings",
-            fontSize=6,
-            fillColor=colors.HexColor("#4B83C4"),
-        )
-    )
-
-    drawing.add(
-        String(
-            100 * mm,
-            2 * mm,
-            "Other Liabilities",
-            fontSize=6,
-            fillColor=colors.HexColor("#6B7280"),
-        )
-    )
-
+    """True stacked bar chart for equity, borrowings and other liabilities."""
+    if balance.empty:
+        return Drawing(PAGE_WIDTH-2*MARGIN,25*mm)
+    b=balance.copy()
+    for col in ["equity_capital","reserves","borrowings","other_liabilities"]:
+        if col not in b.columns: b[col]=0
+        b[col]=pd.to_numeric(b[col],errors="coerce").fillna(0)
+    years=b["year"].astype(str).tolist()
+    equity=(b["equity_capital"]+b["reserves"]).tolist()
+    borrow=b["borrowings"].tolist(); other=b["other_liabilities"].tolist()
+    drawing=Drawing(PAGE_WIDTH-2*MARGIN,70*mm)
+    drawing.add(String((PAGE_WIDTH-2*MARGIN)/2,66*mm,"Balance Sheet Composition (Stacked)",
+                       textAnchor="middle",fontName="Vera-Bold",fontSize=9,fillColor=NAVY))
+    px,py,pw,ph=15*mm,12*mm,PAGE_WIDTH-2*MARGIN-30*mm,47*mm
+    totals=[max(0,e)+max(0,b)+max(0,o) for e,b,o in zip(equity,borrow,other)]
+    ymax=max(totals+[1])*1.1
+    for i in range(5):
+        frac=i/4;y=py+frac*ph
+        drawing.add(Line(px,y,px+pw,y,strokeColor=colors.HexColor("#E5E7EB"),strokeWidth=.4))
+        drawing.add(String(px-2*mm,y-1.5*mm,f"{frac*ymax:,.0f}",textAnchor="end",
+                           fontName="Vera",fontSize=4.5,fillColor=GREY))
+    n=len(years); step=pw/max(n,1); bw=min(7*mm,step*.68)
+    for i in range(n):
+        x=px+i*step+(step-bw)/2; cumulative=0
+        for value,fill in [(equity[i],NAVY),(borrow[i],colors.HexColor("#4B83C4")),(other[i],colors.HexColor("#A7B5C7"))]:
+            value=max(0,value); h=value/ymax*ph; y=py+cumulative/ymax*ph
+            if h>0: drawing.add(Rect(x,y,bw,h,fillColor=fill,strokeColor=WHITE,strokeWidth=.3))
+            cumulative+=value
+        drawing.add(String(x+bw/2,py-4.5*mm,str(years[i])[-9:],textAnchor="middle",
+                           fontName="Vera",fontSize=4.2,fillColor=GREY))
+    for label,fill,x in [("Equity",NAVY,30*mm),("Borrowings",colors.HexColor("#4B83C4"),65*mm),
+                         ("Other Liabilities",colors.HexColor("#A7B5C7"),105*mm)]:
+        drawing.add(Rect(x,2*mm,3*mm,3*mm,fillColor=fill,strokeColor=fill))
+        drawing.add(String(x+4*mm,2.2*mm,label,fontName="Vera",fontSize=5.5,fillColor=DARK))
     return drawing
 
 
@@ -789,142 +689,28 @@ def balance_sheet_chart(balance):
 # ============================================================
 
 def cashflow_waterfall(latest_cf):
-
-    cfo = clean_number(
-        latest_cf["operating_activity"]
-    ) or 0
-
-    cfi = clean_number(
-        latest_cf["investing_activity"]
-    ) or 0
-
-    cff = clean_number(
-        latest_cf["financing_activity"]
-    ) or 0
-
-    net = clean_number(
-        latest_cf["net_cash_flow"]
-    )
-
-    if net is None:
-        net = cfo + cfi + cff
-
-    values = [
-        cfo,
-        cfi,
-        cff,
-        net,
-    ]
-
-    labels = [
-        "CFO",
-        "CFI",
-        "CFF",
-        "Net Cash Flow",
-    ]
-
-    drawing = Drawing(
-        PAGE_WIDTH - 2 * MARGIN,
-        65 * mm
-    )
-
-    drawing.add(
-        String(
-            (PAGE_WIDTH - 2 * MARGIN) / 2,
-            61 * mm,
-            "Cash Flow Waterfall - Latest Year",
-            textAnchor="middle",
-            fontName="Helvetica-Bold",
-            fontSize=9,
-            fillColor=NAVY,
-        )
-    )
-
-    chart_left = 20 * mm
-    chart_bottom = 13 * mm
-    chart_width = PAGE_WIDTH - 2 * MARGIN - 40 * mm
-    chart_height = 40 * mm
-
-    max_value = max(
-        abs(v) for v in values
-    )
-
-    if max_value == 0:
-        max_value = 1
-
-    scale = chart_height / (2 * max_value)
-
-    zero_y = chart_bottom + chart_height / 2
-
-    # Zero line
-    drawing.add(
-        Line(
-            chart_left,
-            zero_y,
-            chart_left + chart_width,
-            zero_y,
-            strokeColor=GREY,
-            strokeWidth=0.6,
-        )
-    )
-
-    bar_width = chart_width / 6
-
-    x_positions = [
-        chart_left + bar_width * 0.8,
-        chart_left + bar_width * 2.1,
-        chart_left + bar_width * 3.4,
-        chart_left + bar_width * 4.7,
-    ]
-
-    for x, value, label in zip(
-        x_positions,
-        values,
-        labels
-    ):
-
-        height = abs(value) * scale
-
-        if value >= 0:
-            y = zero_y
-            fill = GREEN
-        else:
-            y = zero_y - height
-            fill = RED
-
-        drawing.add(
-            Rect(
-                x,
-                y,
-                bar_width * 0.65,
-                height,
-                fillColor=fill,
-                strokeColor=fill,
-            )
-        )
-
-        drawing.add(
-            String(
-                x + bar_width * 0.325,
-                y + height + 2,
-                format_number(value),
-                textAnchor="middle",
-                fontSize=5.5,
-                fillColor=DARK,
-            )
-        )
-
-        drawing.add(
-            String(
-                x + bar_width * 0.325,
-                chart_bottom,
-                label,
-                textAnchor="middle",
-                fontSize=6,
-                fillColor=NAVY,
-            )
-        )
-
+    """Latest-year CFO, CFI, CFF and Net Cash Flow visual."""
+    cfo=clean_number(latest_cf.get("operating_activity")) or 0
+    cfi=clean_number(latest_cf.get("investing_activity")) or 0
+    cff=clean_number(latest_cf.get("financing_activity")) or 0
+    net=clean_number(latest_cf.get("net_cash_flow"))
+    if net is None: net=cfo+cfi+cff
+    values=[cfo,cfi,cff,net]; labels=["CFO","CFI","CFF","Net Cash Flow"]
+    drawing=Drawing(PAGE_WIDTH-2*MARGIN,65*mm)
+    drawing.add(String((PAGE_WIDTH-2*MARGIN)/2,61*mm,"Cash Flow Waterfall - Latest Year",
+                       textAnchor="middle",fontName="Vera-Bold",fontSize=9,fillColor=NAVY))
+    left,bottom=20*mm,13*mm; width=PAGE_WIDTH-2*MARGIN-40*mm; height=40*mm
+    maxv=max([abs(v) for v in values]+[1]); scale=height/(2*maxv); zero=bottom+height/2
+    drawing.add(Line(left,zero,left+width,zero,strokeColor=GREY,strokeWidth=.7))
+    step=width/5; bw=min(15*mm,step*.65)
+    for i,(v,label) in enumerate(zip(values,labels)):
+        x=left+(i+.5)*step-bw/2; h=abs(v)*scale; fill=GREEN if v>=0 else RED
+        y=zero if v>=0 else zero-h
+        drawing.add(Rect(x,y,bw,max(h,.8),fillColor=fill,strokeColor=fill))
+        drawing.add(String(x+bw/2,y+h+2 if v>=0 else y-7,format_number(v),
+                           textAnchor="middle",fontName="Vera",fontSize=5.2,fillColor=DARK))
+        drawing.add(String(x+bw/2,bottom,label,textAnchor="middle",
+                           fontName="Vera-Bold",fontSize=5.5,fillColor=NAVY))
     return drawing
 
 
@@ -1296,7 +1082,7 @@ def build_tearsheet(
         ("Debt / Equity", format_number(debt_equity)),
         ("Market Cap", format_crore(market_cap)),
     ]
-
+    
     # --------------------------------------------------------
     # DOCUMENT
     # --------------------------------------------------------
@@ -1310,6 +1096,7 @@ def build_tearsheet(
         bottomMargin=MARGIN,
         title=f"{company_name} ({ticker}) Tearsheet",
         author="Sprint 1 Data Foundation",
+        canvasmaker=UncompressedCanvas,
     )
 
     story = []
@@ -1746,7 +1533,7 @@ def _wrapped_table(rows, widths, header_size=5.2, body_size=5.2):
     header_style = ParagraphStyle(
         "WrapHeader", parent=SMALL_STYLE, fontSize=header_size,
         leading=header_size + 1, textColor=WHITE,
-        fontName="Helvetica-Bold",
+        fontName="Vera-Bold",
     )
     body_style = ParagraphStyle(
         "WrapBody", parent=BODY_STYLE, fontSize=body_size,
@@ -1927,6 +1714,7 @@ def build_sector_report(sector_name, company_ids, data, output_path):
         topMargin=MARGIN, bottomMargin=MARGIN,
         title=f"{sector_name} Sector Report",
         author="Sprint 1 Data Foundation",
+        canvasmaker=UncompressedCanvas,
     )
     story = [
         header_bar(
@@ -2019,40 +1807,33 @@ def generate_sector_reports():
 
 
 def validate_company_pdfs():
-    """Check page count and text presence; visual overflow still needs spot-check."""
+    """Validate exact 2-page structure, readable text and 30 KB minimum size."""
     try:
         from pypdf import PdfReader
     except ImportError:
         print("pypdf not installed; PDF validation skipped.")
         return
-
-    pdfs = sorted(OUTPUT_DIR.glob("*_tearsheet.pdf"))
-    valid = 0
-    invalid = []
-
+    pdfs=sorted(OUTPUT_DIR.glob("*_tearsheet.pdf")); valid=0; invalid=[]
     for pdf in pdfs:
         try:
-            reader = PdfReader(str(pdf))
-            pages = len(reader.pages)
-            text_lengths = [
-                len(page.extract_text() or "")
-                for page in reader.pages
-            ]
-            if pages == 2 and all(x > 20 for x in text_lengths):
-                valid += 1
-            else:
-                invalid.append((pdf.name, pages, text_lengths))
+            reader=PdfReader(str(pdf)); pages=len(reader.pages)
+            text_lengths=[len(page.extract_text() or "") for page in reader.pages]
+            size_kb=pdf.stat().st_size/1024
+            problems=[]
+            if pages!=2: problems.append(f"pages={pages}")
+            if any(x<=20 for x in text_lengths): problems.append(f"text={text_lengths}")
+            if pdf.stat().st_size<30*1024: problems.append(f"size={size_kb:.1f}KB<30KB")
+            if problems: invalid.append((pdf.name,"; ".join(problems)))
+            else: valid+=1
         except Exception as exc:
-            invalid.append((pdf.name, "ERROR", str(exc)))
-
-    print("\n" + "=" * 70)
+            invalid.append((pdf.name,f"ERROR: {exc}"))
+    print("\n"+"="*70)
     print("COMPANY PDF VALIDATION")
-    print("=" * 70)
-    print("PDFs found:", len(pdfs))
-    print("Valid 2-page PDFs:", valid)
-    print("Invalid PDFs:", len(invalid))
-    for item in invalid:
-        print("  ", item)
+    print("="*70)
+    print("PDFs found:",len(pdfs))
+    print("Valid 2-page / 30KB+ PDFs:",valid)
+    print("Invalid PDFs:",len(invalid))
+    for item in invalid: print("  ",item)
 
 
 def print_day34_summary():

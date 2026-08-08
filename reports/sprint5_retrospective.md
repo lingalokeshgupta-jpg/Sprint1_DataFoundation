@@ -49,3 +49,11 @@ professional, presentation-ready reports for the NIFTY 100 companies.
 The sprint successfully converted the processed financial data into
 company-level, sector-level, and portfolio-level reporting outputs
 that can be used for analysis and presentation.
+
+## Data Limitations
+
+1. **ATGL Cash Flow Data**  
+   ATGL is present in the companies master table but has no corresponding records in the supplied `cashflow.xlsx` source file. Therefore, the Cash Flow Intelligence module processes **91 companies**. No synthetic financial values were introduced.
+
+2. **Sector Data**  
+   The supplied sectors dataset contains **10 distinct broad sectors**. Therefore, **10 sector reports** were generated rather than creating an artificial 11th sector.
